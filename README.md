@@ -102,6 +102,18 @@ Each accepted email is saved:
 
 Images are uploaded first and the rows written last, so a failure leaves no half-saved submission; the email stays in the inbox and is retried.
 
+## Front page
+
+Every **Sunday at 9:00 New York time** (EST/EDT), the backend turns every submission not yet used in a generation into one humorous newspaper front page, using the configured model (text only, for now). It's saved as a generation linked to the submissions used, so each submission appears once. Messages go to the model oldest first with their sender's name; the prompt is capped at 6,000 characters to fit a small local model, and anything that doesn't fit waits for the next run. If the model fails, nothing is saved and the submissions stay unused.
+
+Run it on demand with the token from `.env`:
+
+```sh
+curl -X POST localhost:3100/jobs/front-page -H "Authorization: Bearer $JOBS_TOKEN"
+```
+
+It returns `created` (with the generation id and counts), `skipped` (no new submissions, or a run already going), or a 503 `failed`. The schedule runs inside each backend process; with several instances in production it should move to a single external scheduler calling this endpoint.
+
 ## Generations
 
 AI output made from submissions is saved by `GenerationsService.save()` (nothing calls it yet):

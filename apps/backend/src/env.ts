@@ -13,6 +13,8 @@ const envSchema = z.object({
   /// OPENAI_BASE_URL is set (empty means OpenAI). Models are always chosen here, never defaulted.
   OPENAI_BASE_URL: z.preprocess((value) => (value === "" ? undefined : value), z.url().optional()),
   OPENAI_API_KEY: z.string().min(1),
+  /// Bearer token for POST /jobs/front-page.
+  JOBS_TOKEN: z.string().min(32),
   OPENAI_TEXT_MODEL: z.string().min(1),
   OPENAI_IMAGE_MODEL: z.preprocess(
     (value) => (value === "" ? undefined : value),

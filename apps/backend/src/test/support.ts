@@ -24,6 +24,9 @@ export async function createTestApp(
   if (!env.S3_ENDPOINT || new URL(env.S3_ENDPOINT).hostname !== "localhost") {
     throw new Error(`Tests must use the local S3 (s3mock), not ${env.S3_ENDPOINT ?? "AWS"}`);
   }
+  if (!new URL(env.DATABASE_URL).pathname.endsWith("_test")) {
+    throw new Error("Tests must use the test database, not the development one");
+  }
   if (!env.OPENAI_BASE_URL || new URL(env.OPENAI_BASE_URL).hostname !== "localhost") {
     throw new Error(`Tests must never reach a real model, not ${env.OPENAI_BASE_URL ?? "OpenAI"}`);
   }

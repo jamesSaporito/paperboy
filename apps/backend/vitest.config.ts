@@ -1,15 +1,26 @@
 import { existsSync } from "node:fs";
 import { defineConfig } from "vitest/config";
 
-// Tests run against the local database (Turbo starts and migrates it first). Existing env vars win.
+// Tests run against the local Postgres (Turbo starts it first). Existing env vars win.
 const rootEnv = new URL("../../.env", import.meta.url);
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
+
+// …but in their own database, never the development one: src/test/global-setup.ts creates and
+// migrates it. Only ever on a local server.
+const testDatabaseUrl = new URL(process.env.DATABASE_URL ?? "postgresql://localhost:5433/paperboy");
+if (testDatabaseUrl.hostname !== "localhost") {
+  throw new Error(`Tests only run against a local Postgres, not ${testDatabaseUrl.hostname}`);
+}
+testDatabaseUrl.pathname = "/paperboy_test";
+process.env.TEST_DATABASE_URL = testDatabaseUrl.href;
 
 export default defineConfig({
   test: {
     // Tests always use the local GreenMail server, whatever .env says: development uses a real
     // Gmail account, which tests must never send from or empty. The mailbox is test-only too.
+    globalSetup: ["./src/test/global-setup.ts"],
     env: {
+      DATABASE_URL: testDatabaseUrl.href,
       MAIL_ADDRESS: "paperboy-test@localhost",
       MAIL_PASSWORD: "test",
       MAIL_IMAP_HOST: "localhost",
@@ -30,6 +41,7 @@ export default defineConfig({
       OPENAI_API_KEY: "test",
       OPENAI_TEXT_MODEL: "test-model",
       OPENAI_IMAGE_MODEL: "",
+      JOBS_TOKEN: "test-jobs-token-that-is-at-least-32-characters",
     },
     // Test files share one database, so they run one at a time.
     fileParallelism: false,
