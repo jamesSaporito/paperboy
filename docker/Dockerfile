@@ -26,11 +26,11 @@ FROM base AS dev
 # Compose starts Postgres itself; this makes @paperboy/db's db:up a no-op in here.
 ENV DEV_CONTAINER=1
 # Pre-create mount points owned by `node` so named volumes inherit that ownership.
-RUN mkdir -p node_modules apps/backend/node_modules apps/twilio-sim/node_modules \
+RUN mkdir -p node_modules apps/backend/node_modules \
       packages/ai/node_modules packages/config/node_modules packages/contracts/node_modules packages/db/node_modules \
       /home/node/.local/share/pnpm \
     && chown -R node:node /app /home/node/.local
 USER node
-EXPOSE 3100 3101
+EXPOSE 3100
 # docker-compose.yml overrides this per service.
 CMD ["sh", "-c", "pnpm install --frozen-lockfile && pnpm dev"]

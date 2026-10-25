@@ -16,6 +16,10 @@
     "mail:up": {
       "cache": false
     },
+    // Starts s3mock, the local S3, via docker compose (a no-op in the dev container).
+    "s3:up": {
+      "cache": false
+    },
     "db:deploy": {
       "dependsOn": ["db:up"],
       "cache": false
@@ -31,15 +35,15 @@
       "dependsOn": ["^typecheck", "db:generate", "^db:generate"]
     },
     "test": {
-      "dependsOn": ["db:generate", "^db:generate", "^db:deploy", "mail:up"],
+      "dependsOn": ["db:generate", "^db:generate", "^db:deploy", "mail:up", "s3:up"],
       // Tests hit the local database and mail server, so results aren't reproducible from inputs alone.
       "cache": false
     },
     "dev": {
-      // The backend gets a running, migrated database. Mail is the Gmail account in .env.
-      "dependsOn": ["^db:generate", "^db:deploy"],
+      // The backend gets a running, migrated database and s3mock. Mail is the Gmail account in .env.
+      "dependsOn": ["^db:generate", "^db:deploy", "s3:up"],
       // Docker Compose sets these per container; .env files are loaded by Node itself.
-      "passThroughEnv": ["PORT", "TWILIO_*", "MAIL_*"],
+      "passThroughEnv": ["PORT", "MAIL_*", "S3_*", "AWS_*"],
       "cache": false,
       "persistent": true
     }

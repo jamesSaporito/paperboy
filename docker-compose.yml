@@ -10,7 +10,6 @@ x-dev: &dev
     # Container-only installs so Linux binaries never collide with the host's.
     - node_modules:/app/node_modules
     - backend_node_modules:/app/apps/backend/node_modules
-    - twilio_sim_node_modules:/app/apps/twilio-sim/node_modules
     - ai_node_modules:/app/packages/ai/node_modules
     - config_node_modules:/app/packages/config/node_modules
     - contracts_node_modules:/app/packages/contracts/node_modules
@@ -33,26 +32,14 @@ services:
     # Other settings come from the bind-mounted .env; this overrides its localhost URL.
     environment:
       DATABASE_URL: postgresql://paperboy:paperboy@postgres:5432/paperboy
+      S3_ENDPOINT: http://s3mock:9090
     depends_on:
       install:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-
-  # Stands in for Twilio and a phone: open http://localhost:3101 to text the app.
-  twilio-sim:
-    <<: *dev
-    working_dir: /app/apps/twilio-sim
-    command: pnpm turbo run dev
-    ports:
-      - "3101:3101"
-    # Container-to-container URLs; the rest comes from .env.
-    environment:
-      TWILIO_SIM_WEBHOOK_URL: http://backend:3100/twilio/messages
-      TWILIO_SIM_PUBLIC_URL: http://twilio-sim:3101
-    depends_on:
-      install:
-        condition: service_completed_successfully
+      s3mock:
+        condition: service_healthy
 
   # Backend tests' mail server (SMTP 3025, IMAP 3143; accepts any login). Development itself uses
   # the real Gmail account in .env.
@@ -66,6 +53,26 @@ services:
       interval: 2s
       timeout: 5s
       retries: 15
+
+  # S3 stand-in for submission images (the real bucket comes from Terraform). Host port 9091
+  # because 9090 is commonly taken. Root so it can write to the named volume.
+  s3mock:
+    image: adobe/s3mock:5.2.3
+    user: "0:0"
+    ports:
+      - "9091:9090"
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: paperboy-submissions,paperboy-test
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /data
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
+    volumes:
+      - s3mock_data:/data
+    # Ready once the server answers (it takes a few seconds to boot), so `up --wait` really waits.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/paperboy-submissions"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
 
   postgres:
     image: postgres:18.6-alpine
@@ -86,10 +93,10 @@ services:
 volumes:
   node_modules:
   backend_node_modules:
-  twilio_sim_node_modules:
   ai_node_modules:
   config_node_modules:
   contracts_node_modules:
   db_node_modules:
   pnpm_store:
   pg_data:
+  s3mock_data:

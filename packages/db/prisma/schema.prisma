@@ -14,16 +14,90 @@ datasource db {
 /// Someone allowed to email the app. They write to their own address (MAIL_ADDRESS plus
 /// `+<inboundToken>`), and only mail from `email` to that address is accepted.
 model Contact {
-  id           String   @id @default(uuid(7))
+  id           String       @id @default(uuid(7))
   name         String
   /// Stored lowercase.
-  email        String   @unique
+  email        String       @unique
   /// Lowercase hex, so it survives mail clients that change the case of addresses.
-  inboundToken String   @unique @map("inbound_token")
+  inboundToken String       @unique @map("inbound_token")
   /// Revoked contacts are kept (so their history can stay linked) but can't send or receive.
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  submissions  Submission[]
 
   @@map("contacts")
+}
+
+/// A message a contact sent in: its text, and its images in S3 (submission_images).
+model Submission {
+  id             String                 @id @default(uuid(7))
+  /// The sender; their name and email are on the contact.
+  contactId      String                 @map("contact_id")
+  contact        Contact                @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  text           String
+  /// Filled in later (AI); null until then.
+  summary        String?
+  /// The email's Message-ID, so a message that's retried isn't saved twice.
+  emailMessageId String?                @unique @map("email_message_id")
+  images         SubmissionImage[]
+  generations    GenerationSubmission[]
+  createdAt      DateTime               @default(now()) @map("created_at")
+
+  @@index([contactId])
+  @@map("submissions")
+}
+
+/// An image from a submission, stored in S3 under `s3Key` (in the S3_BUCKET bucket).
+model SubmissionImage {
+  id           String     @id @default(uuid(7))
+  submissionId String     @map("submission_id")
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  /// Order in the message, from 0.
+  position     Int
+  s3Key        String     @unique @map("s3_key")
+  contentType  String     @map("content_type")
+  sizeBytes    Int        @map("size_bytes")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([submissionId, position])
+  @@map("submission_images")
+}
+
+/// AI output made from one or more submissions: generated text, and optionally a generated image
+/// in S3. Records the models, prompts and token usage behind each, for debugging and cost.
+model Generation {
+  id                String                 @id @default(uuid(7))
+  text              String
+  textModel         String                 @map("text_model")
+  textInstructions  String?                @map("text_instructions")
+  textPrompt        String                 @map("text_prompt")
+  textInputTokens   Int?                   @map("text_input_tokens")
+  textOutputTokens  Int?                   @map("text_output_tokens")
+  /// The image columns are all set or all null (a check constraint in the migration); token counts
+  /// may still be null when OpenAI doesn't report them.
+  imageS3Key        String?                @unique @map("image_s3_key")
+  imageContentType  String?                @map("image_content_type")
+  imageSizeBytes    Int?                   @map("image_size_bytes")
+  imageModel        String?                @map("image_model")
+  imagePrompt       String?                @map("image_prompt")
+  imageInputTokens  Int?                   @map("image_input_tokens")
+  imageOutputTokens Int?                   @map("image_output_tokens")
+  submissions       GenerationSubmission[]
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  @@map("generations")
+}
+
+/// Which submissions a generation was made from. A submission can feed several generations, and
+/// can't be deleted while one uses it.
+model GenerationSubmission {
+  generationId String     @map("generation_id")
+  generation   Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  submissionId String     @map("submission_id")
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+
+  @@id([generationId, submissionId])
+  @@index([submissionId])
+  @@map("generation_submissions")
 }

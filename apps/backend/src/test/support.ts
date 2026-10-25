@@ -10,10 +10,13 @@ export type TestApp = { app: NestExpressApplication; baseUrl: string };
 /** Boots the real app on a random port, against the local database. Close it with `app.close()`. */
 export async function createTestApp(): Promise<TestApp> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  // A second line of defense behind vitest.config.ts: never boot against a real mailbox.
+  // A second line of defense behind vitest.config.ts: never boot against a real mailbox or bucket.
   const env = moduleRef.get<Env>(ENV);
   for (const host of [env.MAIL_IMAP_HOST, env.MAIL_SMTP_HOST]) {
     if (host !== "localhost") throw new Error(`Tests must use the local mail server, not ${host}`);
+  }
+  if (!env.S3_ENDPOINT || new URL(env.S3_ENDPOINT).hostname !== "localhost") {
+    throw new Error(`Tests must use the local S3 (s3mock), not ${env.S3_ENDPOINT ?? "AWS"}`);
   }
   const app = configureApp(moduleRef.createNestApplication<NestExpressApplication>());
   await app.listen(0, "127.0.0.1");

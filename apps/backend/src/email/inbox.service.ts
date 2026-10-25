@@ -149,9 +149,9 @@ export class InboxService implements OnApplicationBootstrap, OnModuleDestroy {
       return;
     }
 
-    const { contactId, text, images } = result.email;
+    const { contactId, text, images, messageId } = result.email;
     try {
-      await this.submissions.create({ text, contactId }, images);
+      await this.submissions.create({ contactId, text, emailMessageId: messageId }, images);
     } catch (error) {
       this.logger.error(
         `Processing message ${uid} failed, leaving it in the inbox: ${String(error)}`,

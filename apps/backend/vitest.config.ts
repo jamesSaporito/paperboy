@@ -18,6 +18,12 @@ export default defineConfig({
       MAIL_SMTP_HOST: "localhost",
       MAIL_SMTP_PORT: "3025",
       MAIL_SMTP_SECURE: "false",
+      // Likewise s3mock, with a bucket of its own, never a real one.
+      S3_ENDPOINT: "http://localhost:9091",
+      S3_BUCKET: "paperboy-test",
+      AWS_REGION: "us-east-1",
+      AWS_ACCESS_KEY_ID: "test",
+      AWS_SECRET_ACCESS_KEY: "test",
     },
     // Test files share one database, so they run one at a time.
     fileParallelism: false,

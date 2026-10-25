@@ -6,7 +6,13 @@ import type { SubmissionImage } from "../submissions/submissions.service";
 import { inboundToken } from "./addresses";
 import { headerValue, senderIsAuthenticated } from "./sender-auth";
 
-export type InboundEmail = { contactId: string; text: string; images: SubmissionImage[] };
+export type InboundEmail = {
+  contactId: string;
+  text: string;
+  images: SubmissionImage[];
+  /** The Message-ID header, when present. */
+  messageId?: string;
+};
 
 export type InboundResult =
   { accepted: true; email: InboundEmail } | { accepted: false; reason: string };
@@ -51,6 +57,7 @@ export async function readInboundEmail(
       // Some people write only a subject.
       text: stripQuotedReply(mail.text ?? "").trim() || (mail.subject ?? "").trim(),
       images: await readImages(mail, logger),
+      messageId: mail.messageId,
     },
   };
 }

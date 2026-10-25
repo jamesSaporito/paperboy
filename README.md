@@ -6,7 +6,6 @@ NestJS backend with PostgreSQL via Prisma, in a pnpm + Turborepo monorepo.
 
 ```
 apps/backend        NestJS API (bundled with tsdown)
-apps/twilio-sim     Local Twilio + phone simulator (dev only)
 packages/ai         OpenAI text (Responses API) and image generation
 packages/db         Prisma schema, migrations, and client
 packages/contracts  Zod schemas and types shared by apps
@@ -27,30 +26,30 @@ cp .env.example .env
 
 ## Docker (recommended)
 
-One command starts everything: Postgres, a local mail server, the backend (after applying migrations) and the Twilio simulator, all with hot reload.
+One command starts everything: Postgres, s3mock (local S3) and the backend (after applying migrations), with hot reload. Mail goes through the Gmail account in `.env`.
 
 ```sh
-pnpm dev:docker       # backend :3100, Twilio simulator :3101, Postgres :5433
+pnpm dev:docker       # backend :3100, Postgres :5433, s3mock :9091
 ```
 
 This wraps `docker compose up --build`. The `install` service runs `pnpm install` once before the app services start; after changing dependencies, rerun `pnpm dev:docker`. To reset container installs and data: `docker compose down -v`.
 
 ## Native
 
-The backend runs on your machine; Postgres (and GreenMail, for tests) still run in Docker and are started automatically by any task that needs them.
+The backend runs on your machine; Postgres, s3mock (and GreenMail, for tests) still run in Docker and are started automatically by any task that needs them.
 
 ```sh
 pnpm install
-pnpm dev          # backend :3100, Twilio simulator :3101
+pnpm dev          # backend :3100
 pnpm build        # backend bundle to apps/backend/dist
-pnpm test         # backend tests against the local database and mail server, simulator tests
+pnpm test         # backend tests against the local database, s3mock and GreenMail; AI tests (no network)
 pnpm db:migrate   # create a migration after editing packages/db/prisma/schema.prisma
 pnpm lint
 pnpm typecheck
 pnpm format
 ```
 
-Task ordering lives in `turbo.json`: `@paperboy/db` owns `db:up` (start Postgres) and `db:deploy` (apply migrations), the backend owns `mail:up` (start GreenMail, the tests' mail server), and the backend's `dev` and `test` depend on what they need. Run `turbo` from inside a package folder to scope it to that package.
+Task ordering lives in `turbo.json`: `@paperboy/db` owns `db:up` (start Postgres) and `db:deploy` (apply migrations), the backend owns `s3:up` (start s3mock) and `mail:up` (start GreenMail, the tests' mail server), and the backend's `dev` and `test` depend on what they need. Run `turbo` from inside a package folder to scope it to that package.
 
 `GET /health` reports whether the backend can reach the database.
 
@@ -64,7 +63,7 @@ Only known contacts get through. Each contact has a private address, the app's a
 2. it's from that contact's own address, and
 3. Gmail's `Authentication-Results` header says the sender's domain passed DMARC, DKIM or SPF, so a forged `From` doesn't count.
 
-Accepted mail becomes a submission (the text, without quoted replies, and image attachments, checked by their contents) and is moved to the `Processed` folder; everything else goes to `Rejected`. Mail that fails to process stays in the inbox and is retried. Emails the app sends set Reply-To to the contact's private address, so replying just works.
+Accepted mail becomes a submission (the text, without quoted replies, and image attachments, checked by their contents; see [Submissions](#submissions)) and is moved to the `Processed` folder; everything else goes to `Rejected`. Mail that fails to process stays in the inbox and is retried. Emails the app sends set Reply-To to the contact's private address, so replying just works.
 
 ```sh
 pnpm --dir apps/backend contact add "Name" person@example.com   # prints their address; rerun to issue a new one
@@ -84,13 +83,26 @@ Run one backend at a time (Docker or native) against the development account.
 
 A free account can send to about 500 recipients a day.
 
-## Twilio simulator
+## Submissions
 
-`apps/twilio-sim` stands in for both Twilio and a person's phone, so messaging works locally without a Twilio account. Open http://localhost:3101 to text the app's number (`TWILIO_PHONE_NUMBER`), with photos.
+Each accepted email is saved:
 
-- **Incoming messages:** each one is POSTed to `TWILIO_SIM_WEBHOOK_URL` exactly as Twilio would: form-encoded `From`, `To`, `Body`, `NumMedia`, `MediaUrl0`…, signed with `X-Twilio-Signature` using `TWILIO_AUTH_TOKEN`. The simulator serves the photos at those media URLs.
-- **Replies:** a TwiML `<Message>` in the webhook response is delivered back to the phone, including `<Media>`.
-- **Messages API:** `POST /2010-04-01/Accounts/{AccountSid}/Messages.json` (Basic auth with the account SID and auth token) sends to the phone, downloads any `MediaUrl`s, and reports `sending`, `sent`, `delivered` (or `failed`) to `StatusCallback`. `GET .../Messages/{Sid}.json` fetches a message.
-- State is in memory: restarting the simulator clears the conversation.
+- **`submissions`:** one row per message with the sender (`contact_id` → `contacts`, which holds their name and email), the `text`, `created_at`, a `summary` (empty for now; filled in by AI later) and `email_message_id`, so a retried email isn't saved twice.
+- **`submission_images`:** one row per photo, in order (`position`), with its `s3_key`, `content_type` and `size_bytes`.
+- **The photos themselves** go to the `S3_BUCKET` bucket under `submissions/<contact id>/<uuid>.<ext>`. Keys are generated; the sender's filenames are never used.
 
-It's not a full Twilio: no voice, Messaging Services, other TwiML verbs, or carrier behavior.
+Images are uploaded first and the rows written last, so a failure leaves no half-saved submission; the email stays in the inbox and is retried.
+
+## Generations
+
+AI output made from submissions is saved by `GenerationsService.save()` (nothing calls it yet):
+
+- **`generations`:** the generated `text` with the `text_model`, `text_instructions`, `text_prompt` and token counts behind it, plus an optional generated image: `image_s3_key`, `image_content_type`, `image_size_bytes`, `image_model`, `image_prompt` and its token counts. A check constraint keeps the image columns all set or all empty.
+- **`generation_submissions`:** which submissions each generation was made from. A submission can feed several generations, and can't be deleted while one uses it.
+- **The image** goes to the same bucket under `generations/<uuid>.<ext>`, uploaded before the rows are written.
+
+To browse submissions and generations, connect your database tool to `postgresql://paperboy:paperboy@localhost:5433/paperboy`.
+
+**Locally**, S3 is s3mock (`adobe/s3mock`) on port 9091 with the `paperboy-submissions` bucket (and `paperboy-test` for tests); its files survive restarts in the `s3mock_data` volume. The app reaches it only through `S3_ENDPOINT`, so there's no s3mock-specific code.
+
+**In production**, the bucket is created by Terraform. Set `S3_BUCKET` and `AWS_REGION`, and leave out `S3_ENDPOINT` and the access keys so the AWS SDK uses its role.

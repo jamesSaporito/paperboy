@@ -1,7 +1,0 @@
-{
-  "extends": "@paperboy/config/tsconfig/base.json",
-  "compilerOptions": {
-    "types": ["node"]
-  },
-  "include": ["src", "tsdown.config.ts"]
-}

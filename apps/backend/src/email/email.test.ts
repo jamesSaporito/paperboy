@@ -12,6 +12,7 @@ import { createTestApp, type TestApp } from "../test/support";
 import { deliverMail } from "../test/mail";
 import { inboundAddress } from "./addresses";
 import { PROCESSED_MAILBOX, REJECTED_MAILBOX } from "./inbox.service";
+import { StorageService } from "../storage/storage.service";
 import { MailService } from "./mail.service";
 
 // These go through the local mail server (GreenMail), which `pnpm test` starts.
@@ -38,6 +39,8 @@ afterEach(() => {
 });
 
 afterAll(async () => {
+  // Submissions block deleting their contact; their image rows go with them.
+  await prisma.client.submission.deleteMany({ where: { contactId: contact.id } });
   await prisma.client.contact.deleteMany({ where: { id: { in: [contact.id, revoked.id] } } });
   await testApp.app.close();
 });
@@ -86,19 +89,28 @@ async function waitForMessage(user: string, mailbox: string, subject: string): P
 }
 
 test(
-  "an email from a contact becomes a submission and is moved to Processed",
+  "an email from a contact is saved, with its photo in S3, and moved to Processed",
   { timeout: 15_000 },
   async () => {
-    const create = vi.spyOn(testApp.app.get(SubmissionsService), "create");
     const subject = uniqueSubject();
 
-    await sendAsContact({ subject, text: "Sent from my phone" });
+    await sendAsContact({ subject, text: `Sent from my phone (${subject})` });
 
-    await vi.waitFor(() => expect(create).toHaveBeenCalledOnce(), { timeout: 10_000 });
-    const [input, images] = create.mock.calls[0]!;
-    expect(input).toEqual({ text: "Sent from my phone", contactId: contact.id });
-    expect(images).toHaveLength(1);
-    expect(images[0]!.data.equals(testImage)).toBe(true);
+    const submission = await vi.waitFor(
+      async () => {
+        const saved = await prisma.client.submission.findFirst({
+          where: { contactId: contact.id, text: `Sent from my phone (${subject})` },
+          include: { images: true },
+        });
+        if (!saved) throw new Error("not saved yet");
+        return saved;
+      },
+      { timeout: 10_000, interval: 200 },
+    );
+    expect(submission.emailMessageId).toMatch(/^<.+>$/);
+    expect(submission.images).toHaveLength(1);
+    const stored = await testApp.app.get(StorageService).getObject(submission.images[0]!.s3Key);
+    expect(stored).toEqual({ data: testImage, contentType: "image/png" });
     await waitForMessage(env.MAIL_ADDRESS, PROCESSED_MAILBOX, subject);
   },
 );
