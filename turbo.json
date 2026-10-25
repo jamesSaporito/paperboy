@@ -12,7 +12,7 @@
     "db:up": {
       "cache": false
     },
-    // Starts GreenMail via docker compose (a no-op inside the dev container).
+    // Starts GreenMail, the tests' mail server, via docker compose (a no-op in the dev container).
     "mail:up": {
       "cache": false
     },
@@ -36,8 +36,8 @@
       "cache": false
     },
     "dev": {
-      // The backend gets a running, migrated database and a mail server.
-      "dependsOn": ["^db:generate", "^db:deploy", "mail:up"],
+      // The backend gets a running, migrated database. Mail is the Gmail account in .env.
+      "dependsOn": ["^db:generate", "^db:deploy"],
       // Docker Compose sets these per container; .env files are loaded by Node itself.
       "passThroughEnv": ["PORT", "TWILIO_*", "MAIL_*"],
       "cache": false,

@@ -30,14 +30,14 @@ cp .env.example .env
 One command starts everything: Postgres, a local mail server, the backend (after applying migrations) and the Twilio simulator, all with hot reload.
 
 ```sh
-pnpm dev:docker       # backend :3100, Twilio simulator :3101, Postgres :5433, GreenMail SMTP :3025 / IMAP :3143
+pnpm dev:docker       # backend :3100, Twilio simulator :3101, Postgres :5433
 ```
 
 This wraps `docker compose up --build`. The `install` service runs `pnpm install` once before the app services start; after changing dependencies, rerun `pnpm dev:docker`. To reset container installs and data: `docker compose down -v`.
 
 ## Native
 
-The backend runs on your machine; Postgres and GreenMail still run in Docker and are started automatically by any task that needs them.
+The backend runs on your machine; Postgres (and GreenMail, for tests) still run in Docker and are started automatically by any task that needs them.
 
 ```sh
 pnpm install
@@ -50,7 +50,7 @@ pnpm typecheck
 pnpm format
 ```
 
-Task ordering lives in `turbo.json`: `@paperboy/db` owns `db:up` (start Postgres) and `db:deploy` (apply migrations), the backend owns `mail:up` (start GreenMail), and the backend's `dev` and `test` depend on them. Run `turbo` from inside a package folder to scope it to that package.
+Task ordering lives in `turbo.json`: `@paperboy/db` owns `db:up` (start Postgres) and `db:deploy` (apply migrations), the backend owns `mail:up` (start GreenMail, the tests' mail server), and the backend's `dev` and `test` depend on what they need. Run `turbo` from inside a package folder to scope it to that package.
 
 `GET /health` reports whether the backend can reach the database.
 
@@ -72,12 +72,15 @@ pnpm --dir apps/backend contact revoke person@example.com
 pnpm --dir apps/backend contact list
 ```
 
-**Locally**, GreenMail stands in for Gmail (`MAIL_*` in `.env`). It doesn't do `+` addresses or add Gmail's headers, so the tests (`apps/backend/src/email/*.test.ts`) deliver mail through `src/test/mail.ts`, which reproduces both.
-
-**In production**, use a dedicated Gmail account (not a personal one):
+**Development and production** each use their own dedicated Gmail account (never a personal one, and never the same one: two backends on one inbox would compete for each message):
 
 1. Turn on 2-Step Verification, then create an app password (Google Account → Security → App passwords).
-2. Set `MAIL_ADDRESS` to the account and `MAIL_PASSWORD` to the app password, and remove the `MAIL_*_HOST`, `_PORT` and `_SECURE` lines so Gmail's defaults apply.
+2. Set `MAIL_ADDRESS` to the account and `MAIL_PASSWORD` to the app password in `.env`. Gmail's servers are the defaults.
+3. Add yourself as a contact and email the address it prints. The app's `Processed` and `Rejected` folders show up as Gmail labels.
+
+Run one backend at a time (Docker or native) against the development account.
+
+**Tests** never touch Gmail: `vitest.config.ts` forces the local GreenMail server whatever `.env` says, and the test app refuses to boot against any other mail host. GreenMail doesn't do `+` addresses or add Gmail's headers, so the tests (`apps/backend/src/email/*.test.ts`) deliver mail through `src/test/mail.ts`, which reproduces both.
 
 A free account can send to about 500 recipients a day.
 
