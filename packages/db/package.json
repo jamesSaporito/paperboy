@@ -1,0 +1,27 @@
+{
+  "name": "@paperboy/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "db:up": "[ -n \"$DEV_CONTAINER\" ] || docker compose up -d --wait postgres",
+    "db:generate": "prisma generate",
+    "db:deploy": "prisma migrate deploy",
+    "db:migrate": "pnpm db:up && prisma migrate dev",
+    "lint": "oxlint --type-aware",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1"
+  },
+  "devDependencies": {
+    "@paperboy/config": "workspace:*",
+    "@types/node": "26.6.5",
+    "prisma": "7.10.1",
+    "typescript": "7.0.2"
+  }
+}

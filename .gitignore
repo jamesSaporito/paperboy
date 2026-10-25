@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Turborepo
+.turbo/
+
+# Env
+.env
+.env*.local
+
+# Logs / OS / editor
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Claude Code local settings
+.claude/settings.local.json

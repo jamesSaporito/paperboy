@@ -1,0 +1,29 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Database naming: plural snake_case tables, snake_case columns, lowercase enum values.
+// Prisma has no global naming setting, so every model, multi-word field, and enum is mapped.
+
+/// Someone allowed to email the app. They write to their own address (MAIL_ADDRESS plus
+/// `+<inboundToken>`), and only mail from `email` to that address is accepted.
+model Contact {
+  id           String   @id @default(uuid(7))
+  name         String
+  /// Stored lowercase.
+  email        String   @unique
+  /// Lowercase hex, so it survives mail clients that change the case of addresses.
+  inboundToken String   @unique @map("inbound_token")
+  /// Revoked contacts are kept (so their history can stay linked) but can't send or receive.
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("contacts")
+}

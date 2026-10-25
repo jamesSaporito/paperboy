@@ -1,0 +1,11 @@
+{
+  "name": "@paperboy/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./prettier": "./prettier.mjs",
+    "./tsconfig/*": "./tsconfig/*",
+    "./oxlint/*": "./oxlint/*"
+  }
+}

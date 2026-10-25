@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Prisma's install scripts aren't needed: engines are fetched on first CLI use. esbuild's (via tsx)
+# only re-checks its binary, which pnpm already installs as a platform-specific optional dependency.
+allowBuilds:
+  "@prisma/engines": false
+  esbuild: false
+  prisma: false

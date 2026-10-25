@@ -1,0 +1,98 @@
+name: paperboy
+
+x-dev: &dev
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    target: dev
+  volumes:
+    - .:/app
+    # Container-only installs so Linux binaries never collide with the host's.
+    - node_modules:/app/node_modules
+    - backend_node_modules:/app/apps/backend/node_modules
+    - twilio_sim_node_modules:/app/apps/twilio-sim/node_modules
+    - ai_node_modules:/app/packages/ai/node_modules
+    - config_node_modules:/app/packages/config/node_modules
+    - contracts_node_modules:/app/packages/contracts/node_modules
+    - db_node_modules:/app/packages/db/node_modules
+    - pnpm_store:/home/node/.local/share/pnpm
+
+services:
+  # Installs once so the app services never run `pnpm install` concurrently on shared volumes.
+  install:
+    <<: *dev
+    command: pnpm install --frozen-lockfile
+
+  backend:
+    <<: *dev
+    # Turbo applies migrations first (backend dev depends on @paperboy/db's db:deploy).
+    working_dir: /app/apps/backend
+    command: pnpm turbo run dev
+    ports:
+      - "3100:3100"
+    # Other settings come from the bind-mounted .env; this overrides its localhost URL.
+    environment:
+      DATABASE_URL: postgresql://paperboy:paperboy@postgres:5432/paperboy
+      MAIL_IMAP_HOST: greenmail
+      MAIL_SMTP_HOST: greenmail
+    depends_on:
+      install:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      greenmail:
+        condition: service_healthy
+
+  # Stands in for Twilio and a phone: open http://localhost:3101 to text the app.
+  twilio-sim:
+    <<: *dev
+    working_dir: /app/apps/twilio-sim
+    command: pnpm turbo run dev
+    ports:
+      - "3101:3101"
+    # Container-to-container URLs; the rest comes from .env.
+    environment:
+      TWILIO_SIM_WEBHOOK_URL: http://backend:3100/twilio/messages
+      TWILIO_SIM_PUBLIC_URL: http://twilio-sim:3101
+    depends_on:
+      install:
+        condition: service_completed_successfully
+
+  # Stands in for Gmail locally: a test mail server (SMTP 3025, IMAP 3143) that accepts any login.
+  greenmail:
+    image: greenmail/standalone:2.1.14
+    ports:
+      - "3025:3025"
+      - "3143:3143"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3143"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  postgres:
+    image: postgres:18.6-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: paperboy
+      POSTGRES_PASSWORD: paperboy
+      POSTGRES_DB: paperboy
+    volumes:
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "paperboy"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  node_modules:
+  backend_node_modules:
+  twilio_sim_node_modules:
+  ai_node_modules:
+  config_node_modules:
+  contracts_node_modules:
+  db_node_modules:
+  pnpm_store:
+  pg_data:

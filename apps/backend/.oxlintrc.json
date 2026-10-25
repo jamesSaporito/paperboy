@@ -1,0 +1,11 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../packages/config/oxlint/base.json"],
+  "rules": {
+    // Nest injects classes by their runtime constructor type, so these imports can't be type-only.
+    "typescript/consistent-type-imports": "off",
+    // Nest modules are empty classes configured by their decorator.
+    "typescript/no-extraneous-class": ["warn", { "allowWithDecorator": true }],
+    "import/no-unassigned-import": ["warn", { "allow": ["reflect-metadata"] }]
+  }
+}

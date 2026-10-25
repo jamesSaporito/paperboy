@@ -1,0 +1,8 @@
+{
+  "extends": "@paperboy/config/tsconfig/nestjs.json",
+  "compilerOptions": {
+    // Uploaded files are typed as the global Express.Multer.File.
+    "types": ["node", "multer"]
+  },
+  "include": ["src", "scripts", "tsdown.config.ts"]
+}

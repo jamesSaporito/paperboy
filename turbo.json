@@ -1,0 +1,47 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "globalDependencies": [".nvmrc"],
+  // Strict env mode would otherwise drop values docker-compose.yml sets for containers.
+  "globalPassThroughEnv": ["DATABASE_URL", "DEV_CONTAINER"],
+  "tasks": {
+    "db:generate": {
+      "inputs": ["prisma/**", "prisma.config.ts"],
+      "outputs": ["src/generated/**"]
+    },
+    // Starts Postgres via docker compose (a no-op inside the dev container).
+    "db:up": {
+      "cache": false
+    },
+    // Starts GreenMail via docker compose (a no-op inside the dev container).
+    "mail:up": {
+      "cache": false
+    },
+    "db:deploy": {
+      "dependsOn": ["db:up"],
+      "cache": false
+    },
+    "build": {
+      "dependsOn": ["^build", "^db:generate"],
+      "outputs": ["dist/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint", "db:generate", "^db:generate"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck", "db:generate", "^db:generate"]
+    },
+    "test": {
+      "dependsOn": ["db:generate", "^db:generate", "^db:deploy", "mail:up"],
+      // Tests hit the local database and mail server, so results aren't reproducible from inputs alone.
+      "cache": false
+    },
+    "dev": {
+      // The backend gets a running, migrated database and a mail server.
+      "dependsOn": ["^db:generate", "^db:deploy", "mail:up"],
+      // Docker Compose sets these per container; .env files are loaded by Node itself.
+      "passThroughEnv": ["PORT", "TWILIO_*", "MAIL_*"],
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
