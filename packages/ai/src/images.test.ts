@@ -78,3 +78,14 @@ test("an image use case fixes its options, and calls can override them", async (
     { prompt: "A harbor", size: "1024x1024", quality: "high", output_format: "jpeg" },
   ]);
 });
+
+test("without an image model, nothing is sent", async () => {
+  const { ai, requests } = fakeOpenAI(() => ({ body: imagesBody([testImage]) }), {
+    imageModel: undefined,
+  });
+
+  await expect(ai.generateImages({ prompt: "A tree" })).rejects.toThrow(
+    "No image model configured",
+  );
+  expect(requests).toHaveLength(0);
+});

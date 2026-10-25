@@ -16,6 +16,10 @@
     "mail:up": {
       "cache": false
     },
+    // Starts the local llama.cpp model via docker compose (a no-op in the dev container).
+    "llama:up": {
+      "cache": false
+    },
     // Starts s3mock, the local S3, via docker compose (a no-op in the dev container).
     "s3:up": {
       "cache": false
@@ -40,10 +44,11 @@
       "cache": false
     },
     "dev": {
-      // The backend gets a running, migrated database and s3mock. Mail is the Gmail account in .env.
-      "dependsOn": ["^db:generate", "^db:deploy", "s3:up"],
+      // The backend gets a running, migrated database, s3mock and the local model. Mail is the
+      // Gmail account in .env.
+      "dependsOn": ["^db:generate", "^db:deploy", "s3:up", "llama:up"],
       // Docker Compose sets these per container; .env files are loaded by Node itself.
-      "passThroughEnv": ["PORT", "MAIL_*", "S3_*", "AWS_*"],
+      "passThroughEnv": ["PORT", "MAIL_*", "S3_*", "AWS_*", "OPENAI_*"],
       "cache": false,
       "persistent": true
     }

@@ -9,6 +9,15 @@ const envSchema = z.object({
   S3_BUCKET: z.string().min(1),
   S3_ENDPOINT: z.url().optional(),
   AWS_REGION: z.string().default("us-east-1"),
+  /// The OpenAI API, or an OpenAI-compatible server such as the local llama.cpp container when
+  /// OPENAI_BASE_URL is set (empty means OpenAI). Models are always chosen here, never defaulted.
+  OPENAI_BASE_URL: z.preprocess((value) => (value === "" ? undefined : value), z.url().optional()),
+  OPENAI_API_KEY: z.string().min(1),
+  OPENAI_TEXT_MODEL: z.string().min(1),
+  OPENAI_IMAGE_MODEL: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().optional(),
+  ),
   /// The mailbox the app reads and sends from: a dedicated Gmail account and its app password.
   /// Defaults are Gmail's; locally the hosts point at GreenMail (see docker-compose.yml).
   // The browser rule for email addresses, which allows local hosts like paperboy@localhost.

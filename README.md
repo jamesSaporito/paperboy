@@ -26,17 +26,17 @@ cp .env.example .env
 
 ## Docker (recommended)
 
-One command starts everything: Postgres, s3mock (local S3) and the backend (after applying migrations), with hot reload. Mail goes through the Gmail account in `.env`.
+One command starts everything: Postgres, s3mock (local S3), a local LLM (llama.cpp) and the backend (after applying migrations), with hot reload. Mail goes through the Gmail account in `.env`.
 
 ```sh
-pnpm dev:docker       # backend :3100, Postgres :5433, s3mock :9091
+pnpm dev:docker       # backend :3100, Postgres :5433, s3mock :9091, llama.cpp :8081
 ```
 
 This wraps `docker compose up --build`. The `install` service runs `pnpm install` once before the app services start; after changing dependencies, rerun `pnpm dev:docker`. To reset container installs and data: `docker compose down -v`.
 
 ## Native
 
-The backend runs on your machine; Postgres, s3mock (and GreenMail, for tests) still run in Docker and are started automatically by any task that needs them.
+The backend runs on your machine; Postgres, s3mock, llama.cpp (and GreenMail, for tests) still run in Docker and are started automatically by any task that needs them.
 
 ```sh
 pnpm install
@@ -51,7 +51,16 @@ pnpm format
 
 Task ordering lives in `turbo.json`: `@paperboy/db` owns `db:up` (start Postgres) and `db:deploy` (apply migrations), the backend owns `s3:up` (start s3mock) and `mail:up` (start GreenMail, the tests' mail server), and the backend's `dev` and `test` depend on what they need. Run `turbo` from inside a package folder to scope it to that package.
 
-`GET /health` reports whether the backend can reach the database.
+`GET /health` reports whether the backend can reach the database. `GET /ai-health` asks the configured model for a haiku (see [AI](#ai)).
+
+## AI
+
+`@paperboy/ai` talks to the OpenAI API, or to any OpenAI-compatible server. Which one is set by `OPENAI_BASE_URL` in `.env`:
+
+- **Local model (default for development):** `OPENAI_BASE_URL=http://localhost:8081/v1` and `OPENAI_TEXT_MODEL=llama`; the API key can be anything. This is the `llama` container: llama.cpp serving `LLAMA_MODEL` from `LLAMA_MODELS_DIR` (by default the `models` folder next to this project), CPU only since Docker on macOS can't use the GPU. Free, but slower, and it can't generate images.
+- **OpenAI:** leave `OPENAI_BASE_URL` empty and set a real `OPENAI_API_KEY`, `OPENAI_TEXT_MODEL` and (for images) `OPENAI_IMAGE_MODEL`.
+
+Inside Docker, Compose points the backend at the `llama` container by its in-network address whenever `OPENAI_BASE_URL` is set. `GET /ai-health` sends a three-word instruction and caps the output at 200 tokens: on OpenAI every call still costs money, so it shouldn't be exposed publicly as is. Tests never reach a model: they replace the `AI` provider with a fake, and the test config points `OPENAI_BASE_URL` at an address nothing listens on.
 
 ## Email
 

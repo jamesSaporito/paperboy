@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createAi, type Ai } from "../ai";
+import type { AiConfig } from "../types";
 
 export type RecordedRequest = { method: string; url: URL; body: Record<string, unknown> };
 
@@ -9,7 +10,10 @@ export type FakeReply = { status?: number; body: unknown };
  * An `Ai` whose HTTP calls are answered by `reply` instead of OpenAI. Requests are recorded so
  * tests can check exactly what would have been sent.
  */
-export function fakeOpenAI(reply: (request: RecordedRequest) => FakeReply) {
+export function fakeOpenAI(
+  reply: (request: RecordedRequest) => FakeReply,
+  config: Partial<AiConfig> = {},
+) {
   const requests: RecordedRequest[] = [];
   const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(input instanceof Request ? input.url : input);
@@ -27,6 +31,7 @@ export function fakeOpenAI(reply: (request: RecordedRequest) => FakeReply) {
     imageModel: "default-image-model",
     maxRetries: 0,
     fetch,
+    ...config,
   });
   return { ai, requests };
 }

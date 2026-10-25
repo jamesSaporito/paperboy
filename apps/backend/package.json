@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "mail:up": "[ -n \"$DEV_CONTAINER\" ] || docker compose up -d --wait greenmail",
     "s3:up": "[ -n \"$DEV_CONTAINER\" ] || docker compose up -d --wait s3mock",
+    "llama:up": "[ -n \"$DEV_CONTAINER\" ] || docker compose up -d --wait llama",
     "contact": "tsx scripts/contact.ts"
   },
   "dependencies": {

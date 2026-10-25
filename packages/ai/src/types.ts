@@ -6,7 +6,8 @@ export type AiConfig = {
   apiKey: string;
   /** Default models. Each request can override them, e.g. a cheaper model for a simple use case. */
   textModel: string;
-  imageModel: string;
+  /** Optional: not every endpoint can generate images (e.g. a local llama.cpp model). */
+  imageModel?: string;
   /** Passed through to the OpenAI client. `fetch` is how tests replace the network. */
   baseURL?: string;
   timeout?: number;

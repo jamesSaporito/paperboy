@@ -5,10 +5,12 @@ import type { GeneratedImages, ImageRequest } from "./types";
 /** Generates images with the Images API. Images come back as bytes, not URLs. */
 export async function generateImages(
   client: OpenAI,
-  defaultModel: string,
+  defaultModel: string | undefined,
   request: ImageRequest,
 ): Promise<GeneratedImages> {
   const model = request.model ?? defaultModel;
+  // Checked here, before any request is sent.
+  if (!model) throw new Error("No image model configured: set one in the AI config or the request");
   const response = await client.images.generate({
     model,
     prompt: request.prompt,

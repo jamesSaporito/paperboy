@@ -24,6 +24,12 @@ export default defineConfig({
       AWS_REGION: "us-east-1",
       AWS_ACCESS_KEY_ID: "test",
       AWS_SECRET_ACCESS_KEY: "test",
+      // And never a real model (which costs money): an address nothing listens on, so anything not
+      // replaced with a fake fails at once. Tests that use AI override the AI provider.
+      OPENAI_BASE_URL: "http://localhost:9/v1",
+      OPENAI_API_KEY: "test",
+      OPENAI_TEXT_MODEL: "test-model",
+      OPENAI_IMAGE_MODEL: "",
     },
     // Test files share one database, so they run one at a time.
     fileParallelism: false,
